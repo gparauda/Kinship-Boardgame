@@ -19,6 +19,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import nt
 import random
+
+def game_input(prompt: str) -> str:
+    answer = input(prompt).strip()
+
+    if answer.lower() == "q":
+        print("\nGame ended by player.")
+        raise SystemExit
+
+    return answer
 FOOD_REFERENCE = {
      1: 1,
     2: 1,
@@ -65,7 +74,7 @@ EVENTS_T1 = [
     },
     {
         "name": "Animal Migration",
-        "description": "The hunt is unusually successful. Add 2 to your total Hunt score.",
+        "description": "The animal migration makes it easier to hunt. Add 2 to your total Hunt score.",
         "threat": 6,
         "food_modifier": 0,
         "hunt_modifier": 2,
@@ -75,7 +84,7 @@ EVENTS_T1 = [
     },
     {
         "name": "Calm Skies",
-        "description": "Nothing unusual happens this turn.",
+        "description": "Everything is going smoothly.",
         "threat": 5,
         "food_modifier": 0,
         "hunt_modifier": 0,
@@ -85,7 +94,7 @@ EVENTS_T1 = [
     },
     {
         "name": "Rocky Terrain",
-        "description": "Hunting is more difficult. Subtract 3 from your total Hunt score.",
+        "description": "The mountainous terrain makes hunting more difficult. Subtract 3 from your total Hunt score.",
         "threat": 3,
         "food_modifier": 0,
         "hunt_modifier": -3,
@@ -95,7 +104,7 @@ EVENTS_T1 = [
     },
     {
         "name": "Local Thieves",
-        "description": "Your tribe loses 3 stored Food before workers are allocated.",
+        "description": "Thieves steal 3 food from your supplies.",
         "threat": 5,
         "food_modifier": 0,
         "hunt_modifier": 0,
@@ -264,7 +273,7 @@ def parse_allocation(text: str) -> dict[str, int]:
     return allocation
 
 def draw_event(turn: int) -> dict:
-    if turn <= 7:
+    if turn <= 7 and turn > 1:
         return random.choice(EVENTS_T1)
     elif turn <= 14:
         return random.choice(EVENTS_T2)
@@ -280,7 +289,7 @@ def resolve_sacrifice(state: GameState) -> None:
     print("3. Immediately finish all Kinship projects")
 
     while True:
-        choice = input("Choose 1, 2, or 3: ").strip()
+        choice = game_input("Choose 1, 2, or 3: ")
 
         if choice == "1":
             state.people -= 1
@@ -302,7 +311,7 @@ def resolve_sacrifice(state: GameState) -> None:
             state.people += completed
 
             print("The worshipper was sacrificed.")
-            print(f"{completed} Kinship project(s) finished -> +{completed} people.")
+            print(f"{completed} Kinship project(s) finished -> +{completed} new people added to the tribe.")
             break
 
         else:
@@ -351,7 +360,7 @@ def resolve_kinship_projects(state: GameState) -> None:
     state.people += completed
 
     if completed > 0:
-        print(f"{completed} kinship project(s) finished -> +{completed} people")
+        print(f"{completed} kinship project(s) finished -> +{completed} new people added to the tribe.")
 def check_technology_completion(state: GameState) -> None:
     required = {"stick", "rope", "rock"}
 
@@ -359,13 +368,13 @@ def check_technology_completion(state: GameState) -> None:
         print("Technology complete! Choose one permanent die-face upgrade.")
 
         while True:
-            category = input("Upgrade which category? (F, W, or T): ").strip().upper()
+            category = game_input("Upgrade which category? (F, W, or T): ").upper()
             if category in {"F", "W", "T"}:
                 break
             print("Invalid category. Choose F, W, or T.")
 
         while True:
-            face_raw = input("Which die face to upgrade? (1-6): ").strip()
+            face_raw = game_input("Which die face to upgrade? (1-6): ")
             if face_raw in {"1", "2", "3", "4", "5", "6"}:
                 face = int(face_raw)
                 break
@@ -387,7 +396,7 @@ def play_turn(state: GameState) -> None:
     print(state.current_event["description"])
 
     if state.prayer_tokens >= 2:
-        use_prayer = input(
+        use_prayer = game_input(
             f"You have {state.prayer_tokens} Prayer Tokens. "
             "Spend 2 to ignore this event? type y or n: "
         ).strip().lower()
@@ -416,7 +425,7 @@ def play_turn(state: GameState) -> None:
     available_workers = state.people - active_kinship_workers(state)
 
     while True:
-        raw = input(
+        raw = game_input(
             f"Assign {available_workers} available people (example: 1F 2K 1H 1T 1W): "
         ).strip()
 
@@ -504,13 +513,13 @@ def play_turn(state: GameState) -> None:
 
         food_gained = sum(food_results)
 
-    print(
-        f"Food rolls: {food_faces} -> {food_results} "
-        f"= {food_gained} food gained"
-    )
+        print(
+            f"Food rolls: {food_faces} -> {food_results} "
+            f"= {food_gained} food gained"
+        )
     for category, count in allocation.items():
 
-        if category not in {"K", "H", "T", "W"}:
+        if category not in {"F","K", "H", "T", "W"}:
             print(f"Unknown category '{category}', skipped.")
             continue
 
@@ -530,24 +539,24 @@ def play_turn(state: GameState) -> None:
 
 
 
-    print(f"End of turn: {state.people} people, {state.food} food")
-    print(f"Prayer tokens: {state.prayer_tokens}")
-    #print(f"Kinship projects active: {len(state.kinship_projects)}")
-    print(f"Kinship timers: {state.kinship_projects}")
-    print(f"Tech tiles: {state.tech_tiles}")
+    print(f"End of turn: {state.people} people, {available_workers} available.")
+    if state.prayer_tokens > 0:
+        print(f"Prayer tokens: {state.prayer_tokens}")
+    if state.kinship_projects:
+        print(f"Kinship projects active: {len(state.kinship_projects)}")
+        print(f"Kinship timers: {state.kinship_projects}")
+    if state.tech_tiles:
+        print(f"Tech tiles: {state.tech_tiles}")
 
     state.turn += 1
    
 def main() -> None:
     state = GameState()
-    print("Food and dice prototype")
+    print("Welcome to Kinship!")
     print("Press Enter to play a turn, or type q to quit.\n")
 
     while state.people > 0:
-        command = input("Next turn? ").strip().lower()
-        if command == "q":
-            break
-
+        command = game_input("Next turn? ")
         play_turn(state)
 
     print("\nGame over.")
