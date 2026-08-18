@@ -1,8 +1,7 @@
-#Playtest prototype for the food + dice loop.
-# basic rules:
+# Kinship rules:
 # - Start with 5 people and 7 food.
 # - Each 'person' is 1 die roll per turn, allocated to one of the following actions: hunt (H), gather (F), invest in technology (T), 
-#   [ignore for now]worship(W) , or work on kinship projects (K).
+#   Worship (W) , or work on kinship projects (K).
 # - After rolling, you must have 1 food per person.
 # - If you do not have enough food, you lose 1 person max per turn and your food is wiped to 0.
 # Events: each turn, a random event is drawn that may affect the threat level of hunts, the amount of food gained from gathering, or other modifiers.
@@ -14,17 +13,20 @@
 # - kinship projects require 2 people to start and take 2 turns to complete, meaning those 2 people will be unavailable for the duration of the project.
 #       Each completed project adds 1 person to your tribe.
 
+#github command: git add .
+#git commit -m "Updated worship and game input"
+#git push
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-import nt
 import random
 
 def game_input(prompt: str) -> str:
     answer = input(prompt).strip()
 
     if answer.lower() == "q":
-        print("\nGame ended by player.")
+        print("\n game quit.")
         raise SystemExit
 
     return answer
@@ -224,7 +226,7 @@ class GameState:
     food: int = 7
     turn: int = 1
     prayer_tokens: int = 0
-    kinship_projects: list[str] = None
+    kinship_projects: list[int] = None
     tech_tiles: list[str] = None
     tech_upgrades: dict[str, dict[int, int]] = None
     current_event: dict | None = None
@@ -275,6 +277,17 @@ def parse_allocation(text: str) -> dict[str, int]:
 def draw_event(turn: int) -> dict:
     if turn <= 7 and turn > 1:
         return random.choice(EVENTS_T1)
+    elif turn == 1:
+        return {
+            "name": "First Turn",
+            "description": "No event on the first turn.",
+            "threat": 5,
+            "food_modifier": 0,
+            "hunt_modifier": 0,
+            "food_loss": 0,
+            "kinship_modifier": 0,
+            "prayer_modifier": 0
+        }
     elif turn <= 14:
         return random.choice(EVENTS_T2)
     else:
@@ -282,36 +295,100 @@ def draw_event(turn: int) -> dict:
 def tech_bonus(state: GameState, category: str, roll: int) -> int:
 
     return state.tech_upgrades.get(category, {}).get(roll, 0)   
-def resolve_sacrifice(state: GameState) -> None:
-    print("\nSACRIFICE REQUIRED")
-    print("1. +10 food")
-    print("2. 1 free Technology upgrade")
-    print("3. Immediately finish all Kinship projects")
+def choose_technology_upgrade(state: GameState) -> None:
+    print("\nChoose a permanent die-face upgrade.")
+    print("F = Food")
+    print("W = Worship")
+
+    while True:
+        category = game_input("Choose category (F/W): ").upper()
+
+        if category in {"F", "W"}:
+            break
+
+        print("Invalid category. Choose F or W.")
+
+    while True:
+        face_input = game_input("Choose die face to upgrade (1-6): ")
+
+        if face_input in {"1", "2", "3", "4", "5", "6"}:
+            face = int(face_input)
+            break
+
+        print("Invalid face. Choose 1-6.")
+
+    old_bonus = state.tech_upgrades[category].get(face, 0)
+    state.tech_upgrades[category][face] = old_bonus + 1
+
+    if category == "F":
+        old_result = FOOD_REFERENCE[face] + old_bonus
+        new_result = FOOD_REFERENCE[face] + old_bonus + 1
+        print(f"Food face {face}: {old_result} -> {new_result}")
+
+    elif category == "W":
+        effect, base_value = WORSHIP_REFERENCE[face]
+        old_result = base_value + old_bonus
+        new_result = base_value + old_bonus + 1
+        print(f"Worship face {face}: {effect} {old_result} -> {new_result}")
+def resolve_sacrifice(state: GameState, roll: int) -> None:
+    upgraded = tech_bonus(state, "W", roll) > 0
+
+    if upgraded:
+        print("\nDEVOUT SACRIFICE")
+        print("This sacrifice has been enhanced by Technology.")
+        print("1. +20 food")
+        print("2. 2 free Technology upgrades")
+        print("3. Net 1 new tribe member")
+    else:
+        print("\nSACRIFICE REQUIRED")
+        print("1. +10 food")
+        print("2. 1 free Technology upgrade")
+        print("3. all Kinship projects completed")
 
     while True:
         choice = game_input("Choose 1, 2, or 3: ")
 
         if choice == "1":
             state.people -= 1
-            state.food += 10
-            print("The worshipper was sacrificed. +10 food.")
+
+            if upgraded:
+                state.food += 20
+                print("The devout worshipper was sacrificed. +20 food.")
+            else:
+                state.food += 10
+                print("The worshipper was sacrificed. +10 food.")
+
             break
 
         elif choice == "2":
             state.people -= 1
-            print("The worshipper was sacrificed. You gain 1 free Technology upgrade.")
-            # Technology upgrade logic later.
+
+            if upgraded:
+                print("The devout worshipper was sacrificed. You gain 2 free Technology upgrades.")
+                choose_technology_upgrade(state)
+                choose_technology_upgrade(state)
+            else:
+                print("The worshipper was sacrificed. You gain 1 free Technology upgrade.")
+                choose_technology_upgrade(state)
+
             break
 
         elif choice == "3":
             state.people -= 1
 
-            completed = len(state.kinship_projects)
-            state.kinship_projects = []
-            state.people += completed
+            if upgraded: 
+                state.people += 2
+                print("The devout worshipper was sacrificed. 2 new tribe members join.")
+        
+            else:
+                completed = len(state.kinship_projects)
+                state.kinship_projects = []
+                state.people += completed
 
-            print("The worshipper was sacrificed.")
-            print(f"{completed} Kinship project(s) finished -> +{completed} new people added to the tribe.")
+                print("The worshipper was sacrificed.")
+                print(f"All Kinship projects completed -> +{completed} people.")
+        
+
             break
 
         else:
@@ -337,10 +414,14 @@ def roll_category(state: GameState, category: str, roll: int) -> None:
 
         if effect == "prayer":
             value += tech_bonus(state, "W", roll)
+            
+            value += event_mod(state, "prayer_modifier")
             state.prayer_tokens += value
             print(f"    gained {value} Prayer Token(s)")
         elif effect == "sacrifice":
-            resolve_sacrifice(state) 
+            resolve_sacrifice(state, roll) 
+            if state.people <= 0:
+                return
 
 def active_kinship_workers(state: GameState) -> int:
     return 2 * len(state.kinship_projects)
@@ -361,32 +442,20 @@ def resolve_kinship_projects(state: GameState) -> None:
 
     if completed > 0:
         print(f"{completed} kinship project(s) finished -> +{completed} new people added to the tribe.")
+
 def check_technology_completion(state: GameState) -> None:
     required = {"stick", "rope", "rock"}
 
-    if required.issubset(set(state.tech_tiles)):
-        print("Technology complete! Choose one permanent die-face upgrade.")
+    if not required.issubset(set(state.tech_tiles)):
+        return
 
-        while True:
-            category = game_input("Upgrade which category? (F, W, or T): ").upper()
-            if category in {"F", "W", "T"}:
-                break
-            print("Invalid category. Choose F, W, or T.")
+    print("\nTechnology complete!")
+    choose_technology_upgrade(state)
 
-        while True:
-            face_raw = game_input("Which die face to upgrade? (1-6): ")
-            if face_raw in {"1", "2", "3", "4", "5", "6"}:
-                face = int(face_raw)
-                break
-            print("Enter a number from 1 to 6.")
+    state.tech_tiles = []
+    print("All technology materials were consumed.")
+    state.tech_tiles = []
 
-        # If you already have tech_upgrades in GameState, this applies the permanent upgrade.
-        state.tech_upgrades[category][face] = state.tech_upgrades[category].get(face, 0) + 1
-
-        # Wipe all tech pieces after using the set
-        state.tech_tiles = []
-
-        print(f"Upgraded {category} face {face}. Technology materials reset to 0.")
 def play_turn(state: GameState) -> None:
 
     print(f"\nTurn {state.turn}")
@@ -396,22 +465,31 @@ def play_turn(state: GameState) -> None:
     print(state.current_event["description"])
 
     if state.prayer_tokens >= 2:
-        use_prayer = game_input(
-            f"You have {state.prayer_tokens} Prayer Tokens. "
-            "Spend 2 to ignore this event? type y or n: "
-        ).strip().lower()
 
-        while True: 
+        attempts = 0
+
+        while attempts < 3:
+            use_prayer = game_input(
+                f"You have {state.prayer_tokens} Prayer Tokens. "
+                "Spend 2 to ignore this event? Type y or n: "
+            ).lower()
+
             if use_prayer == "y":
                 state.prayer_tokens -= 2
                 state.current_event["ignored"] = True
                 print("Your prayers have been answered. The event has been ignored.")
                 break
+
             elif use_prayer == "n":
-                print("No time for prayers, perhaps another day")
+                print("No time for prayers, perhaps another day.")
                 break
+
             else:
+                attempts += 1
                 print("The gods are displeased with your indecision. Please choose y or n.")
+
+        else:
+            print("Too many invalid answers. Prayer will not be used this turn.")
 
 
 
@@ -423,7 +501,9 @@ def play_turn(state: GameState) -> None:
 
     print(f"Start of turn: {state.people} people, {state.food} food")
     available_workers = state.people - active_kinship_workers(state)
-
+    if available_workers < 0:
+        print("\nYour tribe has collapsed.")
+        return
     while True:
         raw = game_input(
             f"Assign {available_workers} available people (example: 1F 2K 1H 1T 1W): "
@@ -442,12 +522,12 @@ def play_turn(state: GameState) -> None:
                 f"You assigned {total_assigned}."
             )
             continue
-        valid_categories = {"F", "K", "H", "r", "T", "W"}
+        valid_categories = {"F", "K", "H", "T", "W"}
         invalid = [c for c in allocation if c not in valid_categories]
 
         if invalid:
             print(f"Invalid category: {', '.join(invalid)}")
-            print("Valid categories are: F, K, H, r, T, W.")
+            print("Valid categories are: F, K, H, T, W.")
             continue
 
         if allocation.get("K", 0) % 2 != 0:
@@ -456,7 +536,7 @@ def play_turn(state: GameState) -> None:
         break
     kinship_count = allocation.get("K", 0)
     new_kinship_projects = kinship_count // 2
-    state.kinship_projects.extend([2] * new_kinship_projects)
+    state.kinship_projects.extend([3] * new_kinship_projects)
 
     if new_kinship_projects > 0:
         print(f"Started {new_kinship_projects} kinship project(s).")
@@ -486,6 +566,8 @@ def play_turn(state: GameState) -> None:
             if hunt_score < state.current_event['threat']:
                 state.people = max(state.people - 1, 0)
                 print("  Critical failure! One person dies.")
+                if state.people <= 0:
+                    return
             else:
                 state.food += hunt_score
                 print(f"  Dangerous hunt succeeds. You gain {hunt_score} food.")
@@ -519,8 +601,7 @@ def play_turn(state: GameState) -> None:
         )
     for category, count in allocation.items():
 
-        if category not in {"F","K", "H", "T", "W"}:
-            print(f"Unknown category '{category}', skipped.")
+        if category in {"F", "K", "H"}:
             continue
 
         for _ in range(count):
@@ -536,10 +617,11 @@ def play_turn(state: GameState) -> None:
         state.people = max(state.people - 1, 0)
         state.food = 0
         print("Not enough food. You lose 1 person and food is wiped to 0.")
+        if state.people <= 0:
+            return
 
 
-
-    print(f"End of turn: {state.people} people, {available_workers} available.")
+    print(f"End of turn: {state.people} people")
     if state.prayer_tokens > 0:
         print(f"Prayer tokens: {state.prayer_tokens}")
     if state.kinship_projects:
@@ -552,11 +634,15 @@ def play_turn(state: GameState) -> None:
    
 def main() -> None:
     state = GameState()
-    print("Welcome to Kinship!")
-    print("Press Enter to play a turn, or type q to quit.\n")
+    print("Welcome to Kinship! \n")
+    
 
     while state.people > 0:
-        command = game_input("Next turn? ")
+        if state.turn == 1: 
+            command = game_input("Press Enter to start the game, or type q to quit: ")
+        else:
+            command = game_input("Next turn? ")
+        
         play_turn(state)
 
     print("\nGame over.")
