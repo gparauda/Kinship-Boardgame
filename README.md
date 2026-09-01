@@ -1,0 +1,2 @@
+Designing a board game for my honors thesis project at University of South Carolina. It is a solo dice-rolling survival game currently undergoing the playtesting phase to balance game rules and mechanics.
+I wrote a basic playing interface in the python file for personal playtesting, but wrote game engines and simulator engines to test custom built philosophies in order to counterbalance dominant strategies.
