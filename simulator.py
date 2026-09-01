@@ -9,7 +9,7 @@ import csv
 from pathlib import Path
 from statistics import mean, median
 
-from game_engine import run_game
+from game_engine_vc import run_game
 
 STRATEGIES = [
     "random",
@@ -22,7 +22,7 @@ STRATEGIES = [
 ]
 
 DEFAULT_GAMES_PER_STRATEGY = 1000
-DEFAULT_MAX_TURNS = 20
+DEFAULT_MAX_TURNS = 50
 OUTPUT_DIR = Path("simulation_results")
 
 

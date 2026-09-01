@@ -7,15 +7,20 @@
 # Events: each turn, a random event is drawn that may affect the threat level of hunts, the amount of food gained from gathering, or other modifiers.
 # - gather rolls are made with a standard d6 (faces: 1,1,2,2,2, and 3) The amount of food gained is based on the roll and any modifiers from technology or events.
 # - hunt rolls are made with a special die that has 2 skulls and 4 numbered faces (2-5). If you roll any skulls, you must meet the threat level of the current event to succeed. 
-#       If you fail, you lose 1 person. If you succeed, you gain food equal to the sum of the numbered faces rolled.
+#       If you fail to meet the threat level when a skull is rolled, you lose 1 person. If you succeed, you gain food equal to the sum of the numbered faces rolled.
 # - technology rolls are made with a standard d6. Each face corresponds to a specific technology piece (stick, rope, rock). 
 #       If you collect all three pieces, you can choose one permanent die-face upgrade for any category (F, W, or H).
-# - kinship projects require 2 people to start and take 2 turns to complete, meaning those 2 people will be unavailable for the duration of the project.
+# - kinship projects require 2 people to start and take 3 turns to complete, meaning those 2 people will be unavailable for the duration of the project.
 #       Each completed project adds 1 person to your tribe.
-
+# - worship rolls are made with a standard d6. Each face corresponds to either a prayer or a sacrifice [1,2 = sacrifice, 3-6 = prayer]. If you roll a sacrifice, you must choose one of the following:
+# -    Sacrifice 1 person to gain 10 food, 1 free technology upgrade, or complete all kinship projects.
+# - technology can also be used to upgrade worship rolls, which will change the sacrifice option to a devout sacrifice, which gives you 20 food, 2 free technology upgrades, or 2 new people.
+# - The game ends when you have no people left in your tribe. The goal is to survive as many turns as possible.
 #github command: git add .
 #git commit -m "Updated worship and game input"
 #git push
+
+#ADD pop up questions/prompts to measure later on - i.e. on turn 10 trade off 2 people for 10 turns --> +7 people on turn 20?
 
 from __future__ import annotations
 
